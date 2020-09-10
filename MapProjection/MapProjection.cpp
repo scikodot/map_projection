@@ -5,6 +5,8 @@
 
 const double EARTH_RADIUS = 6378000.0;
 const double PI = 3.14159265358979323846;
+const double TO_RAD = PI / 180.0;
+const double TO_DEG = 1 / TO_RAD;
 
 using namespace std;
 using namespace R3Graph;
@@ -31,25 +33,39 @@ int main()
 
 R2Point getMapProj(const R2Point& map, const R2Point& point)
 {
-    // define map in the initial state, at the (0, 0) point on the Earth surface
-    R3Vector v = R3Vector(EARTH_RADIUS, point.x, point.y);  // point position on the map in Earth basis
-    R3Vector vn = EARTH_RADIUS * v.normalized();  // scale vector to the Earth surface
+    // latitude (b) and longitude (a) of the map center
+    double b = map.x * TO_RAD, a = map.y * TO_RAD;
 
-    // convert point radius-vector to (lat, lon) position on Earth surface,
-    // and move it by the map offset from the (0, 0) point
-    return toLatLon(vn) + map;
+    // projections of the point on the map axes
+    double rx = point.x, ry = point.y;
+
+    // map center vector
+    R3Vector m = EARTH_RADIUS * R3Vector(cos(b) * cos(a), 
+                                         cos(b) * sin(a), 
+                                         sin(b));
+
+    // vector of the given point on the map, in Earth basis
+    R3Vector vm = R3Vector(-rx * sin(a) - ry * sin(b) * cos(a), 
+                            rx * cos(a) - ry * sin(b) * sin(a), 
+                            ry * cos(b));
+
+    // point vector, in Earth basis
+    R3Vector v = m + vm;
+    
+    // scale vector to the Earth surface
+    R3Vector vn = EARTH_RADIUS * v.normalized();
+
+    return toLatLon(vn);
 }
 
 R2Point toLatLon(const R3Vector& v)
 {
-    // define basis vectors
-    R3Vector ex = R3Vector(1, 0, 0), 
-             ey = R3Vector(0, 1, 0), 
-             ez = R3Vector(0, 0, 1);
+    // define basis vector of Z axis
+    R3Vector ez = R3Vector(0, 0, 1);
 
     // determine latitude and longitude of the desired point
     double lat = 0.5 * PI - v.angle(ez);
     double lon = atan2(v.y, v.x);
     
-    return 180.0 / PI * R2Point(lat, lon);
+    return R2Point(lat, lon) * TO_DEG;
 }
