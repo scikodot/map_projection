@@ -5,6 +5,7 @@
 
 const double EARTH_RADIUS = 6378000.0;
 const double PI = 3.14159265358979323846;
+const double PI_2 = PI * 0.5;
 const double TO_RAD = PI / 180.0;
 const double TO_DEG = 1 / TO_RAD;
 
@@ -33,21 +34,27 @@ int main()
 
 R2Point getMapProj(const R2Point& map, const R2Point& point)
 {
-    // latitude (b) and longitude (a) of the map center
-    double b = map.x * TO_RAD, a = map.y * TO_RAD;
+    // latitude and longitude of the map center
+    double lat = map.x * TO_RAD, lon = map.y * TO_RAD;
 
-    // projections of the point on the map axes
+    // point components
     double rx = point.x, ry = point.y;
 
+    // pre-calculate sines and cosines for performance reasons
+    double sinLat = sin(lat),
+           sinLon = sin(lon),
+           cosLat = cos(lat),
+           cosLon = cos(lon);
+
     // map center vector
-    R3Vector m = EARTH_RADIUS * R3Vector(cos(b) * cos(a), 
-                                         cos(b) * sin(a), 
-                                         sin(b));
+    R3Vector m = EARTH_RADIUS * R3Vector(cosLat * cosLon, 
+                                         cosLat * sinLon, 
+                                         sinLat);
 
     // vector of the given point on the map, in Earth basis
-    R3Vector vm = R3Vector(-rx * sin(a) - ry * sin(b) * cos(a), 
-                            rx * cos(a) - ry * sin(b) * sin(a), 
-                            ry * cos(b));
+    R3Vector vm = R3Vector(-rx * sinLon - ry * sinLat * cosLon, 
+                            rx * cosLon - ry * sinLat * sinLon, 
+                            ry * cosLat);
 
     // point vector, in Earth basis
     R3Vector v = m + vm;
@@ -64,8 +71,8 @@ R2Point toLatLon(const R3Vector& v)
     R3Vector ez = R3Vector(0, 0, 1);
 
     // determine latitude and longitude of the desired point
-    double lat = 0.5 * PI - v.angle(ez);
-    double lon = atan2(v.y, v.x);
+    double lat = PI_2 - v.angle(ez), 
+           lon = atan2(v.y, v.x);
     
     return R2Point(lat, lon) * TO_DEG;
 }
