@@ -1,4 +1,5 @@
 #include <cmath>
+#include <iostream>
 
 #include "R2Graph/R2Graph.h"
 #include "R3Graph/R3Graph.h"
@@ -13,7 +14,6 @@ using namespace std;
 using namespace R3Graph;
 
 R2Point getMapProj(const R2Point& map, const R2Point& point);
-R2Point toLatLon(const R3Vector& v);
 
 int main()
 {
@@ -22,7 +22,7 @@ int main()
     {
         cout << "Enter map position (lat, lon) and point on the map (x, y):" << endl;
         cin >> m >> p;
-        if (cin.bad())
+        if (!cin.good())
             break;
 
         R2Point pointProj = getMapProj(m, p);
@@ -35,44 +35,38 @@ int main()
 R2Point getMapProj(const R2Point& map, const R2Point& point)
 {
     // latitude and longitude of the map center
-    double lat = map.x * TO_RAD, lon = map.y * TO_RAD;
+    double mLat = map.x * TO_RAD, mLon = map.y * TO_RAD;
 
-    // point components
-    double rx = point.x, ry = point.y;
-
-    // pre-calculate sines and cosines for performance reasons
-    double sinLat = sin(lat),
-           sinLon = sin(lon),
-           cosLat = cos(lat),
-           cosLon = cos(lon);
+    // pre-calculate sines and cosines
+    double sinLat = sin(mLat),
+           sinLon = sin(mLon),
+           cosLat = cos(mLat),
+           cosLon = cos(mLon);
 
     // map center vector
-    R3Vector m = EARTH_RADIUS * R3Vector(cosLat * cosLon, 
-                                         cosLat * sinLon, 
+    R3Vector m = EARTH_RADIUS * R3Vector(cosLat * cosLon,
+                                         cosLat * sinLon,
                                          sinLat);
 
-    // vector of the given point on the map, in Earth basis
-    R3Vector vm = R3Vector(-rx * sinLon - ry * sinLat * cosLon, 
-                            rx * cosLon - ry * sinLat * sinLon, 
-                            ry * cosLat);
-
-    // point vector, in Earth basis
-    R3Vector v = m + vm;
-    
-    // scale vector to the Earth surface
-    R3Vector vn = EARTH_RADIUS * v.normalized();
-
-    return toLatLon(vn);
-}
-
-R2Point toLatLon(const R3Vector& v)
-{
-    // define basis vector of Z axis
+    // basis vector of the Earth Z axis
     R3Vector ez = R3Vector(0, 0, 1);
 
-    // determine latitude and longitude of the desired point
-    double lat = PI_2 - v.angle(ez), 
-           lon = atan2(v.y, v.x);
-    
-    return R2Point(lat, lon) * TO_DEG;
+    // basis vectors of the map X, Y axes
+    R3Vector emx = ez.vectorProduct(m).normalized();
+    R3Vector emy = m.vectorProduct(emx).normalized();
+
+    // vector of the given point on the map, in Earth basis
+    R3Vector pm = emx * point.x + emy * point.y;
+
+    // vector of the given point, in Earth basis
+    R3Vector p = m + pm;
+
+    // scale vector to the Earth surface
+    p = EARTH_RADIUS * p.normalized();
+
+    // latitude and longitude of the determined point
+    double pLat = PI_2 - p.angle(ez),
+           pLon = atan2(p.y, p.x);
+
+    return R2Point(pLat, pLon) * TO_DEG;
 }
